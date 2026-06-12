@@ -10,7 +10,8 @@ interface ResendWebhookEvent {
     to?: string[]
     from?: string
     subject?: string
-    tags?: { name: string; value: string }[]
+    // Fixed: Webhooks pass an object, but API calls use an array
+    tags?: Record<string, string> | { name: string; value: string }[]
     bounce?: { message?: string }
   }
 }
@@ -21,8 +22,17 @@ export async function POST(request: Request) {
     const eventType = payload.type
     const data = payload.data
 
-    const trackingToken = data.tags?.find((t) => t.name === 'tracking_token')?.value
-    const leadId = data.tags?.find((t) => t.name === 'lead_id')?.value
+    // Helper to safely extract tags regardless of Resend's internal format
+    const getTagValue = (tags: typeof data.tags, key: string): string | undefined => {
+      if (!tags) return undefined
+      if (Array.isArray(tags)) {
+        return tags.find((t) => t.name === key)?.value
+      }
+      return tags[key]
+    }
+
+    const trackingToken = getTagValue(data.tags, 'tracking_token')
+    const leadId = getTagValue(data.tags, 'lead_id')
 
     let emailLog = trackingToken
       ? await prisma.emailLog.findUnique({ where: { trackingToken } })
