@@ -169,7 +169,7 @@ model Activity {
 model Settings {
   id                  String   @id @default(auto()) @map("_id") @db.ObjectId
   businessId          String?  @unique @db.ObjectId
-  business            Business @relation(fields: [businessId], references: [id])
+  business            Business? @relation(fields: [businessId], references: [id])
   googleSheetId       String?
   googleSheetRange    String?
   resendApiKey        String?
