@@ -7,7 +7,7 @@ import bcrypt from 'bcryptjs'
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -15,8 +15,9 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
     const users = await prisma.user.findMany({
-      where: { businessId: params.id },
+      where: { businessId: id },
       select: {
         id: true,
         email: true,
@@ -37,7 +38,7 @@ export async function GET(
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -45,6 +46,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
     const body = await request.json()
     const { email, name, password, role } = body
 
@@ -66,7 +68,7 @@ export async function POST(
         name,
         passwordHash,
         role: role || 'BUSINESS_ADMIN',
-        businessId: params.id,
+        businessId: id,
       },
       select: {
         id: true,
