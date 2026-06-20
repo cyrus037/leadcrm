@@ -31,7 +31,7 @@ export async function GET(request: Request) {
       checked++
 
       const lead = emailLog.lead
-      if (lead.status === 'replied' || lead.unsubscribed || lead.bounced) {
+      if (!lead || lead.status === 'replied' || lead.unsubscribed || lead.bounced) {
         continue
       }
 
