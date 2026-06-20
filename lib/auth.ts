@@ -24,7 +24,8 @@ export const authOptions: NextAuthOptions = {
               id: 'admin',
               email,
               name: 'Admin',
-              role: 'admin',
+              role: 'SUPER_ADMIN',
+              businessId: null,
             }
           }
           throw new Error('Invalid password')
@@ -32,6 +33,7 @@ export const authOptions: NextAuthOptions = {
 
         const user = await prisma.user.findUnique({
           where: { email },
+          include: { business: true },
         })
 
         if (!user || !user.passwordHash) {
@@ -48,6 +50,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name,
           role: user.role,
+          businessId: user.businessId,
         }
       },
     }),
@@ -64,6 +67,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id
         token.role = user.role
+        token.businessId = user.businessId
       }
       return token
     },
@@ -71,6 +75,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.id as string
         session.user.role = token.role as string
+        session.user.businessId = token.businessId as string | null
       }
       return session
     },

@@ -19,7 +19,12 @@ export async function GET(request: Request) {
       limit: searchParams.get('limit') || '50',
     })
 
-    const where = leadId ? { leadId } : {}
+    const where: any = leadId ? { leadId } : {}
+
+    // Filter by businessId for non-super-admin users
+    if (session.user.role !== 'SUPER_ADMIN' && session.user.businessId) {
+      where.businessId = session.user.businessId
+    }
 
     const [logs, total] = await Promise.all([
       prisma.emailLog.findMany({

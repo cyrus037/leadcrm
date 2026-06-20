@@ -10,12 +10,12 @@ import { getAppUrl } from './env'
 
 const FROM_EMAIL_FALLBACK = 'info@growphone.in'
 
-function getResendClient(): Resend {
-  const apiKey = process.env.RESEND_API_KEY
-  if (!apiKey) {
+function getResendClient(apiKey?: string): Resend {
+  const key = apiKey || process.env.RESEND_API_KEY
+  if (!key) {
     throw new Error('RESEND_API_KEY is not configured')
   }
-  return new Resend(apiKey)
+  return new Resend(key)
 }
 
 function isEmailTrackingEnabled(): boolean {
@@ -64,10 +64,13 @@ export interface SendEmailOptions {
   type: EmailType
   trackingToken?: string
   threadId?: string
+  businessId?: string | null
+  resendApiKey?: string | null
+  resendFromEmail?: string | null
 }
 
 export async function sendEmailWithTracking(options: SendEmailOptions): Promise<string> {
-  const resend = getResendClient()
+  const resend = getResendClient(options.resendApiKey || undefined)
   const trackingToken = options.trackingToken || generateTrackingToken()
   const threadId = options.threadId || trackingToken
   const appUrl = getAppUrl()
@@ -78,7 +81,7 @@ export async function sendEmailWithTracking(options: SendEmailOptions): Promise<
     trackingToken,
     isEmailTrackingEnabled()
   )
-  const fromEmail = process.env.RESEND_FROM_EMAIL || FROM_EMAIL_FALLBACK
+  const fromEmail = options.resendFromEmail || process.env.RESEND_FROM_EMAIL || FROM_EMAIL_FALLBACK
   const text = `${stripHtmlToText(htmlWithUnsubscribe)}\n\nUnsubscribe: ${unsubscribeUrl}`
 
   const emailLog = await prisma.emailLog.create({
@@ -90,6 +93,7 @@ export async function sendEmailWithTracking(options: SendEmailOptions): Promise<
       trackingToken,
       threadId,
       subject: options.subject,
+      businessId: options.businessId,
     },
   })
 
@@ -153,10 +157,9 @@ export async function sendTemplateEmail(
   type: EmailType,
   immediate = false
 ): Promise<void> {
-  const [lead, template, settings] = await Promise.all([
+  const [lead, template] = await Promise.all([
     prisma.lead.findUnique({ where: { id: leadId } }),
     prisma.template.findUnique({ where: { id: templateId } }),
-    prisma.settings.findFirst(),
   ])
 
   if (!lead || !template) {
@@ -166,6 +169,11 @@ export async function sendTemplateEmail(
   if (lead.unsubscribed || lead.bounced) {
     throw new Error('Lead is unsubscribed or bounced')
   }
+
+  // Fetch business-specific settings
+  const businessId = lead.businessId
+  const where = businessId ? { businessId } : {}
+  const settings = await prisma.settings.findFirst({ where })
 
   const variables = {
     name: lead.name,
@@ -192,6 +200,9 @@ export async function sendTemplateEmail(
       templateId,
       type,
       threadId,
+      businessId,
+      resendApiKey: settings?.resendApiKey,
+      resendFromEmail: settings?.resendFromEmail,
     })
 
     await prisma.activity.create({
@@ -199,6 +210,7 @@ export async function sendTemplateEmail(
         leadId,
         type: 'email_sent',
         description: `Sent ${type} email: ${subject}`,
+        businessId,
       },
     })
   } else {
@@ -212,6 +224,9 @@ export async function sendTemplateEmail(
       templateId,
       type,
       threadId,
+      businessId,
+      resendApiKey: settings?.resendApiKey,
+      resendFromEmail: settings?.resendFromEmail,
     })
   }
 }
@@ -220,15 +235,17 @@ export async function sendNotificationEmail(
   leadName: string,
   leadCompany: string,
   leadEmail: string,
-  replyPreview: string
+  replyPreview: string,
+  businessId?: string | null
 ): Promise<void> {
-  const resend = getResendClient()
-  const settings = await prisma.settings.findFirst()
+  const where = businessId ? { businessId } : {}
+  const settings = await prisma.settings.findFirst({ where })
   const ownerEmail = settings?.ownerEmail || process.env.OWNER_EMAIL || 'growphonedigital@gmail.com'
-  const fromEmail = process.env.RESEND_FROM_EMAIL || FROM_EMAIL_FALLBACK
+  const fromEmail = settings?.resendFromEmail || process.env.RESEND_FROM_EMAIL || FROM_EMAIL_FALLBACK
+  const resend = getResendClient(settings?.resendApiKey || undefined)
 
   const notificationTemplate = await prisma.template.findFirst({
-    where: { type: 'notification', isActive: true },
+    where: { type: 'notification', isActive: true, ...(businessId && { businessId }) },
   })
 
   const html = notificationTemplate

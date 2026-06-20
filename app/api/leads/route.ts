@@ -24,6 +24,11 @@ export async function GET(request: Request) {
 
     const where: Prisma.LeadWhereInput = {}
 
+    // Filter by businessId for non-super-admin users
+    if (session.user.role !== 'SUPER_ADMIN' && session.user.businessId) {
+      where.businessId = session.user.businessId
+    }
+
     if (status && status !== 'all') {
       where.status = status as Prisma.LeadWhereInput['status']
     }
@@ -71,6 +76,9 @@ export async function POST(request: Request) {
     const body = await request.json()
     const parsed = leadCreateSchema.parse(body)
 
+    // For non-super-admin users, assign lead to their business
+    const businessId = session.user.role !== 'SUPER_ADMIN' ? session.user.businessId : null
+
     const lead = await prisma.lead.create({
       data: {
         email: parsed.email.toLowerCase().trim(),
@@ -79,6 +87,7 @@ export async function POST(request: Request) {
         status: parsed.status || 'new',
         notes: parsed.notes,
         tags: parsed.tags || [],
+        businessId,
       },
     })
 
@@ -87,6 +96,7 @@ export async function POST(request: Request) {
         leadId: lead.id,
         type: 'status_change',
         description: `Lead created with status: ${parsed.status || 'new'}`,
+        businessId,
       },
     })
 

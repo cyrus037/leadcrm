@@ -12,7 +12,15 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const where: any = {}
+
+    // Filter by businessId for non-super-admin users
+    if (session.user.role !== 'SUPER_ADMIN' && session.user.businessId) {
+      where.businessId = session.user.businessId
+    }
+
     const templates = await prisma.template.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
     }).catch((e) => {
       console.error('Error fetching templates:', e)
@@ -41,6 +49,9 @@ export async function POST(request: Request) {
 
     const parsed = templateCreateSchema.parse(await request.json())
 
+    // For non-super-admin users, assign template to their business
+    const businessId = session.user.role !== 'SUPER_ADMIN' ? session.user.businessId : null
+
     const template = await prisma.template.create({
       data: {
         name: parsed.name,
@@ -49,6 +60,7 @@ export async function POST(request: Request) {
         htmlContent: parsed.htmlContent,
         variables: parsed.variables || ['name', 'email', 'company'],
         isActive: parsed.isActive ?? true,
+        businessId,
       },
     })
 

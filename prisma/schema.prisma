@@ -13,11 +13,15 @@ model User {
   name          String?
   passwordHash  String?
   role          String    @default("admin")
+  businessId    String?   @db.ObjectId
+  business      Business? @relation(fields: [businessId], references: [id])
   emailVerified DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   sessions      Session[]
   auditLogs     AuditLog[]
+
+  @@index([businessId])
 }
 
 model Session {
@@ -35,6 +39,8 @@ model Lead {
   name            String
   company         String?
   status          LeadStatus      @default(new)
+  businessId      String?         @db.ObjectId
+  business        Business?       @relation(fields: [businessId], references: [id])
   dateAdded       DateTime        @default(now())
   lastContacted   DateTime?
   notes           String?
@@ -56,6 +62,7 @@ model Lead {
   @@index([status])
   @@index([dateAdded])
   @@index([engagementScore])
+  @@index([businessId])
 }
 
 model EmailLog {
@@ -64,6 +71,8 @@ model EmailLog {
   lead            Lead?             @relation(fields: [leadId], references: [id])
   templateId      String            @db.ObjectId
   template        Template          @relation(fields: [templateId], references: [id])
+  businessId      String?           @db.ObjectId
+  business        Business?         @relation(fields: [businessId], references: [id])
   type            EmailType
   status          EmailStatus       @default(pending)
   trackingToken   String?           @unique
@@ -89,6 +98,7 @@ model EmailLog {
   @@index([status])
   @@index([sentAt])
   @@index([threadId])
+  @@index([businessId])
 }
 
 model EmailOpenEvent {
@@ -127,6 +137,8 @@ model Template {
   htmlContent   String
   variables     String[]
   isActive      Boolean         @default(true)
+  businessId    String?         @db.ObjectId
+  business      Business?       @relation(fields: [businessId], references: [id])
   emailLogs     EmailLog[]
   followupQueue FollowupQueue[]
   createdAt     DateTime        @default(now())
@@ -134,12 +146,15 @@ model Template {
 
   @@index([type])
   @@index([isActive])
+  @@index([businessId])
 }
 
 model Activity {
   id          String       @id @default(auto()) @map("_id") @db.ObjectId
   leadId      String       @db.ObjectId
   lead        Lead         @relation(fields: [leadId], references: [id])
+  businessId  String?      @db.ObjectId
+  business    Business?    @relation(fields: [businessId], references: [id])
   type        ActivityType
   description String
   metadata    String?
@@ -148,13 +163,17 @@ model Activity {
   @@index([leadId])
   @@index([createdAt])
   @@index([type])
+  @@index([businessId])
 }
 
 model Settings {
   id                  String   @id @default(auto()) @map("_id") @db.ObjectId
+  businessId          String?  @unique @db.ObjectId
+  business            Business @relation(fields: [businessId], references: [id])
   googleSheetId       String?
   googleSheetRange    String?
   resendApiKey        String?
+  resendFromEmail     String?
   ownerEmail          String?
   followupDay1        Int      @default(7)
   followupDay2        Int      @default(14)
@@ -174,6 +193,8 @@ model FollowupQueue {
   lead         Lead           @relation(fields: [leadId], references: [id])
   templateId   String         @db.ObjectId
   template     Template       @relation(fields: [templateId], references: [id])
+  businessId   String?        @db.ObjectId
+  business     Business?      @relation(fields: [businessId], references: [id])
   scheduledAt  DateTime
   status       FollowupStatus @default(pending)
   sequenceStep Int            @default(0)
@@ -188,21 +209,25 @@ model FollowupQueue {
   @@index([scheduledAt])
   @@index([status])
   @@index([leadId, status])
+  @@index([businessId])
 }
 
 model AuditLog {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String?  @db.ObjectId
-  user      User?    @relation(fields: [userId], references: [id])
-  action    String
-  resource  String
-  details   String?
-  ip        String?
-  createdAt DateTime @default(now())
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String?  @db.ObjectId
+  user       User?    @relation(fields: [userId], references: [id])
+  businessId String?  @db.ObjectId
+  business   Business? @relation(fields: [businessId], references: [id])
+  action     String
+  resource   String
+  details    String?
+  ip         String?
+  createdAt  DateTime @default(now())
 
   @@index([userId])
   @@index([createdAt])
   @@index([action])
+  @@index([businessId])
 }
 
 enum LeadStatus {
@@ -269,4 +294,27 @@ enum FollowupStatus {
   sent
   failed
   cancelled
+}
+
+model Business {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  name            String   @unique
+  slug            String   @unique
+  resendApiKey    String?
+  resendFromEmail String?
+  ownerEmail      String?
+  isActive        Boolean  @default(true)
+  users           User[]
+  leads           Lead[]
+  emailLogs       EmailLog[]
+  templates       Template[]
+  settings        Settings?
+  followupQueue   FollowupQueue[]
+  activities      Activity[]
+  auditLogs       AuditLog[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([slug])
+  @@index([isActive])
 }

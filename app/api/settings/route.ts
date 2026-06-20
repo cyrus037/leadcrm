@@ -25,8 +25,9 @@ async function requireSession() {
   return null
 }
 
-async function getOrCreateSettings() {
-  const existing = await prisma.settings.findFirst()
+async function getOrCreateSettings(businessId?: string | null) {
+  const where = businessId ? { businessId } : {}
+  const existing = await prisma.settings.findFirst({ where })
   if (existing) return existing
 
   return prisma.settings.create({
@@ -34,6 +35,9 @@ async function getOrCreateSettings() {
       googleSheetId: process.env.GOOGLE_SHEET_ID || null,
       googleSheetRange: process.env.GOOGLE_SHEET_RANGE || 'Sheet1!A:E',
       ownerEmail: process.env.OWNER_EMAIL || null,
+      resendApiKey: process.env.RESEND_API_KEY || null,
+      resendFromEmail: process.env.RESEND_FROM_EMAIL || null,
+      businessId,
       ...DEFAULT_SETTINGS,
     },
   })
@@ -41,10 +45,14 @@ async function getOrCreateSettings() {
 
 export async function GET() {
   try {
-    const unauthorized = await requireSession()
-    if (unauthorized) return unauthorized
+    const session = await getServerSession(authOptions)
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
-    const settings = await getOrCreateSettings()
+    // For non-super-admin users, get their business settings
+    const businessId = session.user.role !== 'SUPER_ADMIN' ? session.user.businessId : null
+    const settings = await getOrCreateSettings(businessId)
     const appUrl = getAppUrl()
 
     return NextResponse.json({
@@ -74,12 +82,17 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   try {
-    const unauthorized = await requireSession()
-    if (unauthorized) return unauthorized
+    const session = await getServerSession(authOptions)
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
     const body = await request.json()
     const parsed = settingsUpdateSchema.parse(body)
-    const current = await getOrCreateSettings()
+
+    // For non-super-admin users, update their business settings
+    const businessId = session.user.role !== 'SUPER_ADMIN' ? session.user.businessId : null
+    const current = await getOrCreateSettings(businessId)
 
     const settings = await prisma.settings.update({
       where: { id: current.id },
