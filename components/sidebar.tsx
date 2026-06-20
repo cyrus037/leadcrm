@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { 
   LayoutDashboard, 
   Users, 
@@ -9,10 +9,12 @@ import {
   Settings, 
   FileText,
   BarChart3,
-  Building2
+  Building2,
+  LogOut
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useSession } from 'next-auth/react'
+import { useSession, signOut } from 'next-auth/react'
+import { Button } from '@/components/ui/button'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -29,8 +31,14 @@ const superAdminNavigation = [
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
   const { data: session } = useSession()
   const isSuperAdmin = session?.user?.role === 'SUPER_ADMIN'
+
+  const handleLogout = async () => {
+    await signOut({ redirect: false })
+    router.push('/login')
+  }
 
   return (
     <div className="flex h-full w-64 flex-col border-r bg-card">
@@ -78,16 +86,25 @@ export default function Sidebar() {
           )
         })}
       </nav>
-      <div className="border-t p-4">
+      <div className="border-t p-4 space-y-4">
         <div className="flex items-center gap-3">
           <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-medium">
-            A
+            {session?.user?.name?.[0]?.toUpperCase() || 'A'}
           </div>
-          <div>
-            <p className="text-sm font-medium">Admin</p>
-            <p className="text-xs text-muted-foreground">admin@lead.growphone.in</p>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">{session?.user?.name || 'Admin'}</p>
+            <p className="text-xs text-muted-foreground truncate">{session?.user?.email || 'admin@lead.growphone.in'}</p>
           </div>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full"
+          onClick={handleLogout}
+        >
+          <LogOut className="h-4 w-4 mr-2" />
+          Logout
+        </Button>
       </div>
     </div>
   )
