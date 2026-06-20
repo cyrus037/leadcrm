@@ -317,6 +317,5 @@ model Business {
 
   @@unique([name])
   @@unique([slug])
-  @@index([slug])
   @@index([isActive])
 }
