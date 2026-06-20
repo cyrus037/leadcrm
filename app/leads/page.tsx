@@ -8,8 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
-import { Search, Plus, Mail, MoreHorizontal } from 'lucide-react'
+import { Search, Plus, Mail, MoreHorizontal, Trash2 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import Link from 'next/link'
 
@@ -106,6 +107,26 @@ export default function LeadsPage() {
     } catch (error) {
       console.error('Error adding lead:', error)
       alert('Failed to add lead')
+    }
+  }
+
+  const handleDeleteLead = async (leadId: string) => {
+    if (!confirm('Are you sure you want to delete this lead?')) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/leads/${leadId}`, { method: 'DELETE' })
+      if (response.ok) {
+        fetchLeads()
+        alert('Lead deleted successfully')
+      } else {
+        const data = await response.json()
+        alert(data.error || 'Failed to delete lead')
+      }
+    } catch (error) {
+      console.error('Error deleting lead:', error)
+      alert('Failed to delete lead')
     }
   }
 
@@ -270,9 +291,22 @@ export default function LeadsPage() {
                       >
                         <Mail className="h-4 w-4" />
                       </Button>
-                      <Button size="sm" variant="ghost">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button size="sm" variant="ghost">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => handleDeleteLead(lead.id)}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </TableCell>
                 </TableRow>
